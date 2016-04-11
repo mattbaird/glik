@@ -29,10 +29,10 @@ const CRLF = "\r\n"
 type API struct {
 	Server     string
 	Version    string
-	XrfKey     string
 	QlikUser   string
 	ClientKey  string
 	ClientCert string
+	XrfKey     string
 	CertAuth   string
 }
 
@@ -49,19 +49,21 @@ func DefaultApi() API {
 	if err != nil {
 		fmt.Printf("error reading ca bytes:%v\n", err)
 	}
-	api := NewAPI(DEFAULT_SERVER)
+	api := NewAPI(DEFAULT_SERVER, "atscale")
 	api.ClientKey = string(clientKeyBytes)
 	api.ClientCert = string(clientCertBytes)
 	api.CertAuth = string(certAuthBytes)
 	return api
 }
 
-func NewAPI(server string) API {
+func NewAPI(server string, user string) API {
 	fixedUpServer := server
 	if strings.HasSuffix(server, "/") {
 		fixedUpServer = server[0 : len(server)-1]
 	}
-	return API{Server: fixedUpServer}
+	api := API{Server: fixedUpServer}
+	api.QlikUser = user
+	return api
 }
 
 type About struct {
@@ -70,4 +72,30 @@ type About struct {
 	DatabaseProvider string `json:"databaseProvider,omitempty"`
 	NodeType         int    `json:"nodeType,omitempty"`
 	SchemaPath       string `json:"schemaPath,omitempty"`
+}
+
+type PublishResults struct {
+	Owner       *Owner  `json:"owner,omitempty"`
+	Name        string  `json:"name,omitempty"`
+	AppId       string  `json:"appId,omitempty"`
+	PublishTime string  `json:"publishTime,omitempty"`
+	Published   bool    `json:"published,omitempty"`
+	Stream      *Stream `json:"stream,omitempty"`
+	FileSize    bool    `json:"fileSize,omitempty"`
+	Id          bool    `json:"id,omitempty"`
+}
+
+type Owner struct {
+	UserId        string `json:"userId,omitempty"`
+	UserDirectory string `json:"userDirectory,omitempty"`
+	Name          string `json:"name,omitempty"`
+	Id            string `json:"id,omitempty"`
+}
+
+type Stream struct {
+	Name string `json:"name,omitempty"`
+	Id   string `json:"id,omitempty"`
+}
+
+type AppListResults struct {
 }

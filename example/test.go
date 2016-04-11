@@ -12,4 +12,10 @@ func main() {
 	if err != nil {
 		fmt.Printf("err:%v\n", err)
 	}
+	listOfApps, err := api.List()
+	fmt.Printf("list:%v\n", listOfApps)
+	if err != nil {
+		fmt.Printf("err:%v\n", err)
+	}
+
 }
