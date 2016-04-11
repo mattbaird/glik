@@ -20,6 +20,7 @@ import (
 	"github.com/satori/go.uuid"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -30,9 +31,10 @@ const content_length_header = "Content-Length"
 const xrf_header = "x-qlik-xrfkey"
 const qlik_user_header = "X-Qlik-User"
 const application_json_content_type = "application/xml"
-const user_header_value = "UserDirectory=Internal; UserId=%s"
+const user_header_value = "UserDirectory=%s; UserId=%s"
 const POST = "POST"
 const GET = "GET"
+const PUT = "PUT"
 const DELETE = "DELETE"
 
 var ErrDoesNotExist = errors.New("Does Not Exist")
@@ -46,36 +48,66 @@ func (api *API) About() (About, error) {
 	var retval About
 	headers := make(map[string]string)
 	headers[xrf_header] = xrfKey
-	headers[qlik_user_header] = fmt.Sprintf(user_header_value, api.QlikUser)
+	headers[qlik_user_header] = api.makeQlikUserHeader()
 	headers[content_type_header] = application_json_content_type
 	err := api.makeRequest(url, GET, nil, &retval, headers, connectTimeOut, readWriteTimeout)
 	return retval, err
 }
 
 //http://help.qlik.com/en-US/sense-developer/2.2/Subsystems/RepositoryServiceAPI/Content/RepositoryServiceAPI/RepositoryServiceAPI-App-Publish.htm
-func (api *API) Publish(appId, streamId, name string) (PublishResults, error) {
+func (api *API) Publish(appId, streamId, name string) (ApplicationResult, error) {
 	xrfKey := makeXrfKey()
-	url := fmt.Sprintf("%s/qrs/app/%s/publish?stream=%s&name=%s&xrfkey=%s", api.Server, appId, streamId, name, xrfKey)
-	var retval PublishResults
+	url := fmt.Sprintf("%s/qrs/app/%s/publish?stream=%s&name=%s&xrfkey=%s", api.Server, appId, streamId, url.QueryEscape(name), xrfKey)
+	var retval ApplicationResult
 	headers := make(map[string]string)
 	headers[xrf_header] = xrfKey
-	headers[qlik_user_header] = fmt.Sprintf(user_header_value, api.QlikUser)
+	headers[qlik_user_header] = api.makeQlikUserHeader()
 	headers[content_type_header] = application_json_content_type
-	err := api.makeRequest(url, GET, nil, &retval, headers, connectTimeOut, readWriteTimeout)
+	err := api.makeRequest(url, PUT, nil, &retval, headers, connectTimeOut, readWriteTimeout)
+	return retval, err
+}
+
+//http://help.qlik.com/en-US/sense-developer/2.2/Subsystems/RepositoryServiceAPI/Content/RepositoryServiceAPI/RepositoryServiceAPI-App-Make-Copy.htm
+func (api *API) Copy(appId, name string) (ApplicationResult, error) {
+	xrfKey := makeXrfKey()
+	url := fmt.Sprintf("%s/qrs/app/%s/copy?name=%s&xrfkey=%s", api.Server, appId, url.QueryEscape(name), xrfKey)
+	fmt.Printf("url:%v\n", url)
+	var retval ApplicationResult
+	headers := make(map[string]string)
+	headers[xrf_header] = xrfKey
+	headers[qlik_user_header] = api.makeQlikUserHeader()
+	headers[content_type_header] = application_json_content_type
+	err := api.makeRequest(url, POST, nil, &retval, headers, connectTimeOut, readWriteTimeout)
 	return retval, err
 }
 
 //http://help.qlik.com/en-US/sense-developer/2.2/Subsystems/RepositoryServiceAPI/Content/RepositoryServiceAPI/RepositoryServiceAPI-App-Publish.htm
-func (api *API) List() ([]AppListResults, error) {
+func (api *API) List() ([]ApplicationResult, error) {
 	xrfKey := makeXrfKey()
 	url := fmt.Sprintf("%s/qrs/app?xrfkey=%s", api.Server, xrfKey)
-	var retval []AppListResults
+	var retval []ApplicationResult
 	headers := make(map[string]string)
 	headers[xrf_header] = xrfKey
-	headers[qlik_user_header] = fmt.Sprintf(user_header_value, api.QlikUser)
+	headers[qlik_user_header] = api.makeQlikUserHeader()
 	headers[content_type_header] = application_json_content_type
 	err := api.makeRequest(url, GET, nil, &retval, headers, connectTimeOut, readWriteTimeout)
 	return retval, err
+}
+
+//http://help.qlik.com/en-US/sense-developer/2.2/Subsystems/RepositoryServiceAPI/Content/RepositoryServiceAPI/RepositoryServiceAPI-App-Reload.htm
+func (api *API) Reload(appId string) error {
+	xrfKey := makeXrfKey()
+	url := fmt.Sprintf("%s/qrs/app/%s/reload?xrfkey=%s", api.Server, appId, xrfKey)
+	headers := make(map[string]string)
+	headers[xrf_header] = xrfKey
+	headers[qlik_user_header] = api.makeQlikUserHeader()
+	headers[content_type_header] = application_json_content_type
+	err := api.makeRequest(url, GET, nil, nil, headers, connectTimeOut, readWriteTimeout)
+	return err
+}
+
+func (api *API) makeQlikUserHeader() string {
+	return fmt.Sprintf(user_header_value, api.Directory, api.QlikUser)
 }
 
 func makeXrfKey() string {
@@ -123,8 +155,8 @@ func (api *API) makeRequest(requestUrl string, method string, payload []byte, re
 	if readBodyError != nil {
 		return readBodyError
 	}
-	if false {
-		fmt.Printf("body:%s", body)
+	if true {
+		fmt.Printf("body:%s\n", body)
 	}
 	if resp.StatusCode == 404 {
 		return ErrDoesNotExist
