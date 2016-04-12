@@ -13,14 +13,19 @@ package glik
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/AtScaleInc/apps-shared/httputil"
+	"github.com/gorilla/websocket"
 	"github.com/satori/go.uuid"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -28,7 +33,7 @@ import (
 
 const content_type_header = "Content-Type"
 const content_length_header = "Content-Length"
-const xrf_header = "x-qlik-xrfkey"
+const xrf_header = "X-Qlik-Xrfkey"
 const qlik_user_header = "X-Qlik-User"
 const application_json_content_type = "application/xml"
 const user_header_value = "UserDirectory=%s; UserId=%s"
@@ -44,7 +49,7 @@ var API_VERSION = "2.2"
 //http://help.qlik.com/en-US/sense-developer/2.2/Subsystems/RepositoryServiceAPI/Content/RepositoryServiceAPI/RepositoryServiceAPI-About-API-Get-Description.htm
 func (api *API) About() (About, error) {
 	xrfKey := makeXrfKey()
-	url := fmt.Sprintf("%s/qrs/about?xrfkey=%s", api.Server, xrfKey)
+	url := fmt.Sprintf("%s://%s:%v/qrs/about?xrfkey=%s", "https", api.Server, api.QrsPort, xrfKey)
 	var retval About
 	headers := make(map[string]string)
 	headers[xrf_header] = xrfKey
@@ -57,7 +62,7 @@ func (api *API) About() (About, error) {
 //http://help.qlik.com/en-US/sense-developer/2.2/Subsystems/RepositoryServiceAPI/Content/RepositoryServiceAPI/RepositoryServiceAPI-App-Publish.htm
 func (api *API) Publish(appId, streamId, name string) (ApplicationResult, error) {
 	xrfKey := makeXrfKey()
-	url := fmt.Sprintf("%s/qrs/app/%s/publish?stream=%s&name=%s&xrfkey=%s", api.Server, appId, streamId, url.QueryEscape(name), xrfKey)
+	url := fmt.Sprintf("%s://%s:%v/qrs/app/%s/publish?stream=%s&name=%s&xrfkey=%s", "https", api.Server, api.QrsPort, appId, streamId, url.QueryEscape(name), xrfKey)
 	var retval ApplicationResult
 	headers := make(map[string]string)
 	headers[xrf_header] = xrfKey
@@ -70,7 +75,7 @@ func (api *API) Publish(appId, streamId, name string) (ApplicationResult, error)
 //http://help.qlik.com/en-US/sense-developer/2.2/Subsystems/RepositoryServiceAPI/Content/RepositoryServiceAPI/RepositoryServiceAPI-App-Make-Copy.htm
 func (api *API) Copy(appId, name string) (ApplicationResult, error) {
 	xrfKey := makeXrfKey()
-	url := fmt.Sprintf("%s/qrs/app/%s/copy?name=%s&xrfkey=%s", api.Server, appId, url.QueryEscape(name), xrfKey)
+	url := fmt.Sprintf("%s://%s:%v/qrs/app/%s/copy?name=%s&xrfkey=%s", "https", api.Server, api.QrsPort, appId, url.QueryEscape(name), xrfKey)
 	fmt.Printf("url:%v\n", url)
 	var retval ApplicationResult
 	headers := make(map[string]string)
@@ -84,7 +89,7 @@ func (api *API) Copy(appId, name string) (ApplicationResult, error) {
 //http://help.qlik.com/en-US/sense-developer/2.2/Subsystems/RepositoryServiceAPI/Content/RepositoryServiceAPI/RepositoryServiceAPI-App-Publish.htm
 func (api *API) List() ([]ApplicationResult, error) {
 	xrfKey := makeXrfKey()
-	url := fmt.Sprintf("%s/qrs/app?xrfkey=%s", api.Server, xrfKey)
+	url := fmt.Sprintf("%s://%s:%v/qrs/app?xrfkey=%s", "https", api.Server, api.QrsPort, xrfKey)
 	var retval []ApplicationResult
 	headers := make(map[string]string)
 	headers[xrf_header] = xrfKey
@@ -97,13 +102,70 @@ func (api *API) List() ([]ApplicationResult, error) {
 //http://help.qlik.com/en-US/sense-developer/2.2/Subsystems/RepositoryServiceAPI/Content/RepositoryServiceAPI/RepositoryServiceAPI-App-Reload.htm
 func (api *API) Reload(appId string) error {
 	xrfKey := makeXrfKey()
-	url := fmt.Sprintf("%s/qrs/app/%s/reload?xrfkey=%s", api.Server, appId, xrfKey)
+	url := fmt.Sprintf("%s://%s:%v/qrs/app/%s/reload?xrfkey=%s", "https", api.Server, api.QrsPort, appId, xrfKey)
 	headers := make(map[string]string)
 	headers[xrf_header] = xrfKey
 	headers[qlik_user_header] = api.makeQlikUserHeader()
 	headers[content_type_header] = application_json_content_type
 	err := api.makeRequest(url, GET, nil, nil, headers, connectTimeOut, readWriteTimeout)
 	return err
+}
+
+func (api *API) getTicket() error {
+	//	https://localhost:4243/qps/ticket
+	xrfKey := makeXrfKey()
+	url := fmt.Sprintf("%s://%s:%v/qps/ticket?xrfkey=%s", "https", api.Server, api.AuthPort, xrfKey)
+	fmt.Printf("url:%v\n", url)
+	headers := make(map[string]string)
+	headers[xrf_header] = xrfKey
+	headers[qlik_user_header] = api.makeQlikUserHeader()
+	headers[content_type_header] = application_json_content_type
+	body := `{"UserDirectory":"` + "WIN8-VBOX" + `", "UserId":"` + "atscale" + `"}`
+	err := api.makeRequest(url, POST, []byte(body), nil, headers, connectTimeOut, readWriteTimeout)
+	return err
+}
+
+//https://help.qlik.com/en-US/sense-developer/2.1/Subsystems/EngineAPI/Content/CreatingAppLoadingData/CreateApps/create-app.htm
+func (api *API) Create(name, localizedScriptMainSection string) (Response, error) {
+	createAppCommand := CreateApp(name)
+	return api.executeWebsocketCommand(createAppCommand)
+}
+
+func (api *API) executeWebsocketCommand(command interface{}) (Response, error) {
+	response := Response{}
+	ws := fmt.Sprintf("wss://%s:%v/app", api.Server, api.WebsocketPort)
+	u, err := url.Parse(ws)
+	if err != nil {
+		return response, err
+	}
+	dialer := net.Dialer{}
+	rawConn, err := tls.DialWithDialer(&dialer, "tcp", u.Host, getTlsConfig())
+
+	if err != nil {
+		return response, err
+	}
+
+	xrfKey := makeXrfKey()
+	// your milage may differ
+	wsHeaders := http.Header{
+		"Origin":                   {"http://192.168.5.131"},
+		"Sec-WebSocket-Extensions": {"permessage-deflate; client_max_window_bits, x-webkit-deflate-frame"},
+		xrf_header:                 {xrfKey},
+		qlik_user_header:           {api.makeQlikUserHeader()},
+		content_type_header:        {application_json_content_type},
+	}
+	websocketConnection, resp, err := websocket.NewClient(rawConn, u, wsHeaders, 1024, 1024)
+	if err != nil {
+		return response, fmt.Errorf("websocket.NewClient Error: %s\nResp:%+v", err, resp)
+	}
+	err = websocketConnection.WriteJSON(command)
+	if err != nil {
+		return response, err
+	}
+	err = websocketConnection.ReadJSON(&response)
+	fmt.Printf("response:%v\n", response.Json())
+	return response, err
+
 }
 
 func (api *API) makeQlikUserHeader() string {
@@ -118,7 +180,7 @@ func makeXrfKey() string {
 
 func (api *API) makeRequest(requestUrl string, method string, payload []byte, result interface{}, headers map[string]string,
 	cTimeout time.Duration, rwTimeout time.Duration) error {
-	if false {
+	if true {
 		fmt.Printf("%s:%v\n", method, requestUrl)
 		if payload != nil {
 			fmt.Printf("%v\n", string(payload))
@@ -155,7 +217,7 @@ func (api *API) makeRequest(requestUrl string, method string, payload []byte, re
 	if readBodyError != nil {
 		return readBodyError
 	}
-	if true {
+	if false {
 		fmt.Printf("body:%s\n", body)
 	}
 	if resp.StatusCode == 404 {
@@ -178,4 +240,31 @@ func (api *API) makeRequest(requestUrl string, method string, payload []byte, re
 		}
 	}
 	return nil
+}
+
+func getTlsConfig() *tls.Config {
+	certLocation := os.Getenv("atscale_http_sslcert")
+	keyLocation := os.Getenv("atscale_http_sslkey")
+	caFile := os.Getenv("atscale_ca_file")
+	// default
+	tlsConfig := &tls.Config{InsecureSkipVerify: true}
+	if len(certLocation) > 0 && len(keyLocation) > 0 {
+		// Load client cert if available
+		cert, err := tls.LoadX509KeyPair(certLocation, keyLocation)
+		if err == nil {
+			if len(caFile) > 0 {
+				caCertPool := x509.NewCertPool()
+				caCert, err := ioutil.ReadFile(caFile)
+				if err != nil {
+					fmt.Printf("Error setting up caFile [%s]:%v\n", caFile, err)
+				}
+				caCertPool.AppendCertsFromPEM(caCert)
+				tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true, RootCAs: caCertPool}
+				tlsConfig.BuildNameToCertificate()
+			} else {
+				tlsConfig = &tls.Config{Certificates: []tls.Certificate{cert}, InsecureSkipVerify: true}
+			}
+		}
+	}
+	return tlsConfig
 }

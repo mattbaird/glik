@@ -23,20 +23,26 @@ var (
 	readWriteTimeout = time.Duration(30 * time.Second)
 )
 
-const DEFAULT_SERVER = "https://192.168.99.5:4242"
+const DEFAULT_SERVER = "192.168.99.5"
 const CRLF = "\r\n"
 const DEFAULT_USER = "sa_repository"
 const DEFAULT_DIR = "Internal"
+const DEFAULT_QRS_PORT = 4242
+const DEFAULT_AUTH_PORT = 4243
+const DEFAULT_WEBSOCKET_PORT = 4747
 
 type API struct {
-	Server     string
-	Version    string
-	Directory  string
-	QlikUser   string
-	ClientKey  string
-	ClientCert string
-	XrfKey     string
-	CertAuth   string
+	Server        string
+	QrsPort       int
+	AuthPort      int
+	WebsocketPort int
+	Version       string
+	Directory     string
+	QlikUser      string
+	ClientKey     string
+	ClientCert    string
+	XrfKey        string
+	CertAuth      string
 }
 
 func DefaultApi() API {
@@ -52,14 +58,14 @@ func DefaultApi() API {
 	if err != nil {
 		fmt.Printf("error reading ca bytes:%v\n", err)
 	}
-	api := NewAPI(DEFAULT_SERVER, DEFAULT_DIR, DEFAULT_USER)
+	api := NewAPI(DEFAULT_SERVER, DEFAULT_DIR, DEFAULT_USER, DEFAULT_QRS_PORT, DEFAULT_AUTH_PORT, DEFAULT_WEBSOCKET_PORT)
 	api.ClientKey = string(clientKeyBytes)
 	api.ClientCert = string(clientCertBytes)
 	api.CertAuth = string(certAuthBytes)
 	return api
 }
 
-func NewAPI(server string, directory, user string) API {
+func NewAPI(server string, directory, user string, qrsPort, authPort, websocketPort int) API {
 	fixedUpServer := server
 	if strings.HasSuffix(server, "/") {
 		fixedUpServer = server[0 : len(server)-1]
@@ -67,6 +73,9 @@ func NewAPI(server string, directory, user string) API {
 	api := API{Server: fixedUpServer}
 	api.QlikUser = user
 	api.Directory = directory
+	api.QrsPort = qrsPort
+	api.AuthPort = authPort
+	api.WebsocketPort = websocketPort
 	return api
 }
 
@@ -115,19 +124,6 @@ type Stream struct {
 	Name       string      `json:"name,omitempty"`
 	Id         string      `json:"id,omitempty"`
 	Privileges *Privileges `json:"privileges,omitempty"`
-}
-
-type ApplicationListing struct {
-	Id                    string      `json:"id,omitempty"`
-	Name                  string      `json:"name,omitempty"`
-	AppId                 string      `json:"appId,omitempty"`
-	PublishTime           string      `json:"publishTime,omitempty"`
-	Published             bool        `json:"published"`
-	Stream                *Stream     `json:"stream,omitempty"`
-	SavedInProductVersion string      `json:"savedInProductVersion,omitempty"`
-	MigrationHash         string      `json:"migrationHash,omitempty"`
-	AvailabilityStatus    int         `json:"availabilityStatus"`
-	Privileges            *Privileges `json:"privileges,omitempty"`
 }
 
 type Privileges struct {
