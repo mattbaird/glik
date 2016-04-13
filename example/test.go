@@ -17,11 +17,37 @@ func main() {
 	if err != nil {
 		fmt.Printf("err:%v\n", err)
 	}
-	response, err := api.Create("test123", "main")
+	err = api.OpenWebSocket()
 	if err != nil {
 		fmt.Printf("err:%v\n", err)
+		return
 	}
-	fmt.Printf("create response:%v\n", response.Json())
+	defer api.CloseWebSocket()
+	response, err := api.Create("scriptsetting", "main")
+	if err != nil {
+		fmt.Printf("err:%v\n", err)
+		return
+	}
+	fmt.Printf("Create:%v\n", response.Json())
+	response, err = api.GetActiveDoc()
+	if err != nil {
+		fmt.Printf("err:%v\n", err)
+		return
+	}
+	fmt.Printf("GetActiveDoc:%v\n", response.Json())
+	response, err = api.SetScript("Load RecNo() as NewNumbers AutoGenerate 10;")
+	if err != nil {
+		fmt.Printf("err:%v\n", err)
+		return
+	}
+	fmt.Printf("SetScript:%v\n", response.Json())
+	response, err = api.GetScript()
+	if err != nil {
+		fmt.Printf("err:%v\n", err)
+		return
+	}
+	fmt.Printf("GetScript:%v\n", response.Json())
+
 	if false {
 		copyResults, err := api.Copy("acdb78ec-a0ee-49f1-8741-3580e6af7f63", "testing published")
 		if err != nil {

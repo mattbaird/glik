@@ -127,22 +127,38 @@ func (api *API) getTicket() error {
 
 //https://help.qlik.com/en-US/sense-developer/2.1/Subsystems/EngineAPI/Content/CreatingAppLoadingData/CreateApps/create-app.htm
 func (api *API) Create(name, localizedScriptMainSection string) (Response, error) {
-	createAppCommand := CreateApp(name)
-	return api.executeWebsocketCommand(createAppCommand)
+	command := CreateApp(name)
+	return api.executeWebsocketCommand(command)
 }
 
-func (api *API) executeWebsocketCommand(command interface{}) (Response, error) {
-	response := Response{}
+//https://help.qlik.com/en-US/sense-developer/2.1/Subsystems/EngineAPI/Content/CreatingAppLoadingData/CreateApps/create-and-open-app.htm
+func (api *API) GetActiveDoc() (Response, error) {
+	command := GetActiveDoc()
+	return api.executeWebsocketCommand(command)
+}
+
+//https://help.qlik.com/en-US/sense-developer/2.1/Subsystems/EngineAPI/Content/CreatingAppLoadingData/EditDataLoadScript/set-get-script.htm
+func (api *API) SetScript(script string) (Response, error) {
+	command := SetScript(script)
+	return api.executeWebsocketCommand(command)
+}
+
+func (api *API) GetScript() (Response, error) {
+	command := GetScript()
+	return api.executeWebsocketCommand(command)
+}
+
+func (api *API) OpenWebSocket() error {
 	ws := fmt.Sprintf("wss://%s:%v/app", api.Server, api.WebsocketPort)
 	u, err := url.Parse(ws)
 	if err != nil {
-		return response, err
+		return err
 	}
 	dialer := net.Dialer{}
 	rawConn, err := tls.DialWithDialer(&dialer, "tcp", u.Host, getTlsConfig())
 
 	if err != nil {
-		return response, err
+		return err
 	}
 
 	xrfKey := makeXrfKey()
@@ -155,15 +171,24 @@ func (api *API) executeWebsocketCommand(command interface{}) (Response, error) {
 		content_type_header:        {application_json_content_type},
 	}
 	websocketConnection, resp, err := websocket.NewClient(rawConn, u, wsHeaders, 1024, 1024)
+	api.WebsocketConnection = websocketConnection
 	if err != nil {
-		return response, fmt.Errorf("websocket.NewClient Error: %s\nResp:%+v", err, resp)
+		return fmt.Errorf("websocket.NewClient Error: %s\nResp:%+v", err, resp)
 	}
-	err = websocketConnection.WriteJSON(command)
+	return nil
+}
+
+func (api *API) CloseWebSocket() error {
+	return api.WebsocketConnection.Close()
+}
+
+func (api *API) executeWebsocketCommand(command interface{}) (Response, error) {
+	response := Response{}
+	err := api.WebsocketConnection.WriteJSON(command)
 	if err != nil {
 		return response, err
 	}
-	err = websocketConnection.ReadJSON(&response)
-	fmt.Printf("response:%v\n", response.Json())
+	err = api.WebsocketConnection.ReadJSON(&response)
 	return response, err
 
 }

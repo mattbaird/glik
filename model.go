@@ -13,6 +13,7 @@ package glik
 
 import (
 	"fmt"
+	"github.com/gorilla/websocket"
 	"io/ioutil"
 	"strings"
 	"time"
@@ -25,24 +26,25 @@ var (
 
 const DEFAULT_SERVER = "192.168.99.5"
 const CRLF = "\r\n"
-const DEFAULT_USER = "sa_repository"
-const DEFAULT_DIR = "Internal"
+const DEFAULT_USER = "atscale"
+const DEFAULT_DIR = "WIN8-VBOX"
 const DEFAULT_QRS_PORT = 4242
 const DEFAULT_AUTH_PORT = 4243
 const DEFAULT_WEBSOCKET_PORT = 4747
 
 type API struct {
-	Server        string
-	QrsPort       int
-	AuthPort      int
-	WebsocketPort int
-	Version       string
-	Directory     string
-	QlikUser      string
-	ClientKey     string
-	ClientCert    string
-	XrfKey        string
-	CertAuth      string
+	Server              string
+	QrsPort             int
+	AuthPort            int
+	WebsocketPort       int
+	Version             string
+	Directory           string
+	QlikUser            string
+	ClientKey           string
+	ClientCert          string
+	XrfKey              string
+	CertAuth            string
+	WebsocketConnection *websocket.Conn
 }
 
 func DefaultApi() API {

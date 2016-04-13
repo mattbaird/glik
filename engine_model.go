@@ -33,6 +33,18 @@ func CreateApp(name string) Request {
 	return NewRequest(0, "CreateApp", -1, []string{name})
 }
 
+func SetScript(script string) Request {
+	return NewRequest(3, "SetScript", 1, []string{script})
+}
+
+func GetScript() Request {
+	return NewRequest(2, "GetScript", 1, []string{})
+}
+
+func GetActiveDoc() Request {
+	return NewRequest(1, "GetActiveDoc", -1, []string{})
+}
+
 func NewRequest(id int, method string, handle int, params []string) Request {
 	return Request{JsonRPCVersion: "2.0", Id: id, Method: method, Handle: handle, Params: params}
 }
