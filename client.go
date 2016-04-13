@@ -25,7 +25,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -154,6 +153,12 @@ func (api *API) GetScript() (Response, error) {
 	return api.executeWebsocketCommand(command)
 }
 
+func (api *API) CreateSheet(title, description, id string) (Response, error) {
+	params := CreateSheetParams(title, description, id)
+	command := CreateSheet(params)
+	return api.executeWebsocketCommand(command)
+}
+
 func (api *API) OpenWebSocket() error {
 	ws := fmt.Sprintf("wss://%s:%v/app", api.Server, api.WebsocketPort)
 	u, err := url.Parse(ws)
@@ -161,7 +166,7 @@ func (api *API) OpenWebSocket() error {
 		return err
 	}
 	dialer := net.Dialer{}
-	rawConn, err := tls.DialWithDialer(&dialer, "tcp", u.Host, getTlsConfig())
+	rawConn, err := tls.DialWithDialer(&dialer, "tcp", u.Host, api.getTlsConfig(api.ClientCert, api.ClientKey, api.CertAuth))
 
 	if err != nil {
 		return err
@@ -278,11 +283,7 @@ func (api *API) makeRequest(requestUrl string, method string, payload []byte, re
 	return nil
 }
 
-func getTlsConfig() *tls.Config {
-	certLocation := os.Getenv("atscale_http_sslcert")
-	keyLocation := os.Getenv("atscale_http_sslkey")
-	caFile := os.Getenv("atscale_ca_file")
-	// default
+func (api *API) getTlsConfig(certLocation, keyLocation, caFile string) *tls.Config {
 	tlsConfig := &tls.Config{InsecureSkipVerify: true}
 	if len(certLocation) > 0 && len(keyLocation) > 0 {
 		// Load client cert if available

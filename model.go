@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 )
@@ -48,23 +49,40 @@ type API struct {
 }
 
 func DefaultApi() API {
-	clientKeyBytes, err := ioutil.ReadFile("client_key.pem")
-	if err != nil {
-		fmt.Printf("error reading client key bytes:%v\n", err)
+	certLocation := os.Getenv("atscale_http_sslcert")
+	if len(certLocation) == 0 {
+		certLocation = "client.pem"
 	}
-	clientCertBytes, err := ioutil.ReadFile("client.pem")
-	if err != nil {
-		fmt.Printf("error reading client cert bytes:%v\n", err)
+	keyLocation := os.Getenv("atscale_http_sslkey")
+	if len(keyLocation) == 0 {
+		keyLocation = "client_key.pem"
 	}
-	certAuthBytes, err := ioutil.ReadFile("client.pem")
-	if err != nil {
-		fmt.Printf("error reading ca bytes:%v\n", err)
+	caFileLocation := os.Getenv("atscale_ca_file")
+	if len(caFileLocation) == 0 {
+		caFileLocation = "root.pem"
 	}
 	api := NewAPI(DEFAULT_SERVER, DEFAULT_DIR, DEFAULT_USER, DEFAULT_QRS_PORT, DEFAULT_AUTH_PORT, DEFAULT_WEBSOCKET_PORT)
-	api.ClientKey = string(clientKeyBytes)
-	api.ClientCert = string(clientCertBytes)
-	api.CertAuth = string(certAuthBytes)
+	api.SetTLSItemLocations(certLocation, keyLocation, caFileLocation)
 	return api
+}
+
+func (api *API) SetTLSItemLocations(certLocation, keyLocation, caFile string) error {
+	_, err := ioutil.ReadFile(keyLocation)
+	if err != nil {
+		return fmt.Errorf("error reading client key bytes from [%s]:%v\n", keyLocation, err)
+	}
+	_, err = ioutil.ReadFile(certLocation)
+	if err != nil {
+		return fmt.Errorf("error reading client cert bytes from [%s]:%v\n", certLocation, err)
+	}
+	_, err = ioutil.ReadFile(caFile)
+	if err != nil {
+		return fmt.Errorf("error reading ca bytes from [%s]:%v\n", caFile, err)
+	}
+	api.ClientKey = keyLocation
+	api.ClientCert = certLocation
+	api.CertAuth = caFile
+	return nil
 }
 
 func NewAPI(server string, directory, user string, qrsPort, authPort, websocketPort int) API {

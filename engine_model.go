@@ -17,12 +17,12 @@ import (
 )
 
 type Request struct {
-	JsonRPCVersion string   `json:"jsonrpc,omitempty"`
-	Id             int      `json:"id,omitempty"`
-	Method         string   `json:"method,omitempty"`
-	Handle         int      `json:"handle,omitempty"`
-	Delta          bool     `json:"delta,omitempty"`
-	Params         []string `json:"params"`
+	JsonRPCVersion string      `json:"jsonrpc,omitempty"`
+	Id             int         `json:"id,omitempty"`
+	Method         string      `json:"method,omitempty"`
+	Handle         int         `json:"handle,omitempty"`
+	Delta          bool        `json:"delta,omitempty"`
+	Params         interface{} `json:"params"`
 }
 
 func (r *Request) Json() string {
@@ -54,7 +54,7 @@ func GetActiveDoc() Request {
 	return NewRequest(1, "GetActiveDoc", -1, []string{})
 }
 
-func NewRequest(id int, method string, handle int, params []string) Request {
+func NewRequest(id int, method string, handle int, params interface{}) Request {
 	return Request{JsonRPCVersion: "2.0", Id: id, Method: method, Handle: handle, Params: params}
 }
 
@@ -92,4 +92,50 @@ type Result struct {
 	Type    string `json:"qType,omitempty"`
 	Handle  int    `json:"qHandle,omitempty"`
 	Script  string `json:"qScript,omitempty"`
+}
+
+type SheetParams struct {
+	Title        string        `json:"title,omitempty"`
+	Description  string        `json:"description,omitempty"`
+	Info         *Info         `json:"qInfo,omitempty"`
+	ChildListDef *ChildListDef `json:"qChildListDef,omitempty"`
+}
+
+type Info struct {
+	ID   string `json:"qId,omitempty"`
+	Type string `json:"qType,omitempty"`
+}
+
+type ChildListDef struct {
+	Data *Data `json:"qData,omitempty"`
+}
+
+type Data struct {
+	Title       string `json:"title,omitempty"`
+	Description string `json:"description,omitempty"`
+	Meta        string `json:"meta,omitempty"`
+	Order       string `json:"order,omitempty"`
+	Type        string `json:"type,omitempty"`
+	Id          string `json:"id,omitempty"`
+	Lb          string `json:"lb,omitempty"`
+	Hc          string `json:"hc,omitempty"`
+}
+
+func CreateSheetParams(title, description, id string) SheetParams {
+	params := SheetParams{Title: title, Description: description}
+	params.Info = &Info{ID: id, Type: "sheet"}
+	params.ChildListDef = &ChildListDef{}
+	params.ChildListDef.Data = &Data{Title: "/title",
+		Description: "/description",
+		Meta:        "/meta",
+		Order:       "/order",
+		Type:        "/qInfo/qType",
+		Id:          "/qInfo/qId",
+		Lb:          "/qListObjectDef",
+		Hc:          "/qHyperCubeDef"}
+	return params
+}
+
+func CreateSheet(params SheetParams) Request {
+	return NewRequest(1, "CreateObject", 1, []SheetParams{params})
 }
