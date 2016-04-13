@@ -13,6 +13,7 @@ package glik
 
 import (
 	"encoding/json"
+	"fmt"
 )
 
 type Request struct {
@@ -21,7 +22,7 @@ type Request struct {
 	Method         string   `json:"method,omitempty"`
 	Handle         int      `json:"handle,omitempty"`
 	Delta          bool     `json:"delta,omitempty"`
-	Params         []string `json:"params,omitempty"`
+	Params         []string `json:"params"`
 }
 
 func (r *Request) Json() string {
@@ -31,6 +32,14 @@ func (r *Request) Json() string {
 
 func CreateApp(name string) Request {
 	return NewRequest(0, "CreateApp", -1, []string{name})
+}
+
+func OpenDoc(name string, user, directory string) Request {
+	return NewRequest(0, "OpenDoc", -1, []string{name, fmt.Sprintf("UserDirectory=%s; UserId=%s", directory, user)})
+}
+
+func CreateAppEx(name string) Request {
+	return NewRequest(0, "CreateDocEx", -1, []string{name})
 }
 
 func SetScript(script string) Request {
@@ -60,9 +69,10 @@ type CreateAppParms struct {
 }
 
 type Response struct {
-	JsonRPCVersion string  `json:"jsonrpc,omitempty"`
-	Id             int     `json:"id,omitempty"`
-	Result         *Result `json:"result,omitempty"`
+	JsonRPCVersion string          `json:"jsonrpc,omitempty"`
+	Id             int             `json:"id,omitempty"`
+	Result         *Result         `json:"result,omitempty"`
+	Error          *WebsocketError `json:"error,omitempty"`
 }
 
 func (r *Response) Json() string {
@@ -70,7 +80,16 @@ func (r *Response) Json() string {
 	return string(result)
 }
 
+type WebsocketError struct {
+	Code      int    `json:"code,omitempty"`
+	Parameter string `json:"parameter,omitempty"`
+	Message   string `json:"message,omitempty"`
+}
+
 type Result struct {
 	Success bool   `json:"qSuccess,omitempty"`
 	AppId   string `json:"qAppId,omitempty"`
+	Type    string `json:"qType,omitempty"`
+	Handle  int    `json:"qHandle,omitempty"`
+	Script  string `json:"qScript,omitempty"`
 }

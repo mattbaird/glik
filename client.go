@@ -131,6 +131,12 @@ func (api *API) Create(name, localizedScriptMainSection string) (Response, error
 	return api.executeWebsocketCommand(command)
 }
 
+//https://help.qlik.com/en-US/sense-developer/2.1/Subsystems/EngineAPI/Content/CreatingAppLoadingData/CreateApps/open-app.htm
+func (api *API) Open(name, directory, user string) (Response, error) {
+	command := OpenDoc(name, directory, user)
+	return api.executeWebsocketCommand(command)
+}
+
 //https://help.qlik.com/en-US/sense-developer/2.1/Subsystems/EngineAPI/Content/CreatingAppLoadingData/CreateApps/create-and-open-app.htm
 func (api *API) GetActiveDoc() (Response, error) {
 	command := GetActiveDoc()
@@ -188,7 +194,12 @@ func (api *API) executeWebsocketCommand(command interface{}) (Response, error) {
 	if err != nil {
 		return response, err
 	}
+	//	_, res, err := api.WebsocketConnection.ReadMessage()
+	//	fmt.Printf("res:%v\n", string(res))
 	err = api.WebsocketConnection.ReadJSON(&response)
+	if response.Error != nil {
+		return response, fmt.Errorf("Error [%v] on Parameter [%s]:%v", response.Error.Code, response.Error.Parameter, response.Error.Message)
+	}
 	return response, err
 
 }

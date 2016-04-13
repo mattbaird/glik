@@ -22,28 +22,37 @@ func main() {
 		fmt.Printf("err:%v\n", err)
 		return
 	}
+	appName := "Sales2ndQuarter.qvf"
 	defer api.CloseWebSocket()
-	response, err := api.Create("scriptsetting", "main")
+	response, err := api.Create(appName, "main")
 	if err != nil {
-		fmt.Printf("err:%v\n", err)
+		fmt.Printf("Create err:%v\n", err)
 		return
 	}
 	fmt.Printf("Create:%v\n", response.Json())
+
+	response, err = api.Open(response.Result.AppId, "WIN8-VBOX", "atscale")
+	if err != nil {
+		fmt.Printf("Open err:%v\n", err)
+		return
+	}
+	fmt.Printf("Open:%v\n", response.Json())
+
 	response, err = api.GetActiveDoc()
 	if err != nil {
-		fmt.Printf("err:%v\n", err)
+		fmt.Printf("GetActiveDoc err:%v\n", err)
 		return
 	}
 	fmt.Printf("GetActiveDoc:%v\n", response.Json())
 	response, err = api.SetScript("Load RecNo() as NewNumbers AutoGenerate 10;")
 	if err != nil {
-		fmt.Printf("err:%v\n", err)
+		fmt.Printf("SetScript err:%v\n", err)
 		return
 	}
 	fmt.Printf("SetScript:%v\n", response.Json())
 	response, err = api.GetScript()
 	if err != nil {
-		fmt.Printf("err:%v\n", err)
+		fmt.Printf("GetScript err:%v\n", err)
 		return
 	}
 	fmt.Printf("GetScript:%v\n", response.Json())
