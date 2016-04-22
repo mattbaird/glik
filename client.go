@@ -143,19 +143,30 @@ func (api *API) GetActiveDoc() (Response, error) {
 }
 
 //https://help.qlik.com/en-US/sense-developer/2.1/Subsystems/EngineAPI/Content/CreatingAppLoadingData/EditDataLoadScript/set-get-script.htm
-func (api *API) SetScript(script string) (Response, error) {
-	command := SetScript(script)
+func (api *API) SetScript(handle int, script string) (Response, error) {
+	command := SetScript(handle, script)
 	return api.executeWebsocketCommand(command)
 }
 
-func (api *API) GetScript() (Response, error) {
-	command := GetScript()
+func (api *API) GetScript(handle int) (Response, error) {
+	command := GetScript(handle)
 	return api.executeWebsocketCommand(command)
 }
 
-func (api *API) CreateSheet(title, description, id string) (Response, error) {
-	params := CreateSheetParams(title, description, id)
-	command := CreateSheet(params)
+func (api *API) CreateSheet(handle int, title, description, thumbnail, id string, rows, columns, rank int) (Response, error) {
+	params := CreateSheetParams(title, description, thumbnail, id, rows, columns, rank)
+	command := CreateSheet(handle, params)
+	fmt.Printf("createsheet:%v\n", command.Json())
+	return api.executeWebsocketCommand(command)
+}
+
+func (api *API) ListStreams() (Response, error) {
+	command := GetStreamList()
+	return api.executeWebsocketCommand(command)
+}
+
+func (api *API) DoReload(handle int) (Response, error) {
+	command := DoReload(handle)
 	return api.executeWebsocketCommand(command)
 }
 
@@ -199,13 +210,29 @@ func (api *API) executeWebsocketCommand(command interface{}) (Response, error) {
 	if err != nil {
 		return response, err
 	}
-	//	_, res, err := api.WebsocketConnection.ReadMessage()
-	//	fmt.Printf("res:%v\n", string(res))
-	err = api.WebsocketConnection.ReadJSON(&response)
-	if response.Error != nil {
-		return response, fmt.Errorf("Error [%v] on Parameter [%s]:%v", response.Error.Code, response.Error.Parameter, response.Error.Message)
+	if false {
+		_, res, err := api.WebsocketConnection.ReadMessage()
+		if err != nil {
+			return response, err
+		}
+		fmt.Printf("res:%v\n", string(res))
+		err = json.Unmarshal(res, &response)
+		if err != nil {
+			return response, err
+		}
+		if response.Error != nil {
+			return response, response.Error.GetError()
+		}
+	} else {
+		err = api.WebsocketConnection.ReadJSON(&response)
+		if err == nil {
+			return response, err
+		}
+		if response.Error != nil {
+			return response, response.Error.GetError()
+		}
 	}
-	return response, err
+	return response, nil
 
 }
 
@@ -227,7 +254,7 @@ func (api *API) makeRequest(requestUrl string, method string, payload []byte, re
 			fmt.Printf("%v\n", string(payload))
 		}
 	}
-	client := httputil.NewTimeoutClient(cTimeout, rwTimeout)
+	client := httputil.NewTimeoutClient(cTimeout, rwTimeout, true)
 	var req *http.Request
 	if len(payload) > 0 {
 		var httpErr error
