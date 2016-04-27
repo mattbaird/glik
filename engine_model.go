@@ -58,13 +58,21 @@ func DoReload(handle int) Request {
 	return NewRequest(2, "DoReload", handle, []string{})
 }
 
+func GetProgress(handle int, id int) Request {
+	return NewRequest(2, "GetProgress", handle, []int{id})
+}
+
+func DoSave(handle int) Request {
+	return NewRequest(6, "DoSave", handle, []string{})
+}
+
 func GetActiveDoc() Request {
 	return NewRequest(1, "GetActiveDoc", -1, []string{})
 }
 
 func NewRequest(id int, method string, handle int, params interface{}) Request {
 	if params != nil {
-		fmt.Printf("Params:%v\n", params)
+		fmt.Printf("NewRequest Params:%v\n", params)
 	}
 	return Request{JsonRPCVersion: "2.0", Id: id, Method: method, Handle: handle, Params: params}
 }
@@ -164,13 +172,27 @@ func CreateSheetParamsEx(title, description, id string) SheetParamsEx {
 }
 
 type SheetParams struct {
-	MetaDef   *MetaDef      `json:"qMetaDef,omitempty"`
-	Rank      int           `json:"rank,omitempty"`
-	Thumbnail string        `json:"thumbnail,omitempty"`
-	Columns   int           `json:"columns,omitempty"`
-	Rows      int           `json:"rows,omitempty"`
-	Cells     []interface{} `json:"cells,omitempty"`
-	Info      *Info         `json:"qInfo,omitempty"`
+	MetaDef   *MetaDef   `json:"qMetaDef,omitempty"`
+	Rank      int        `json:"rank,omitempty"`
+	Thumbnail *Thumbnail `json:"thumbnail,omitempty"`
+	Columns   int        `json:"columns,omitempty"`
+	Rows      int        `json:"rows,omitempty"`
+	Cells     []string   `json:"cells"`
+	Info      *Info      `json:"qInfo,omitempty"`
+}
+
+type Thumbnail struct {
+	StaticContentUrlDef *StaticContentUrlDef `json:"qStaticContentUrlDef,omitempty"`
+}
+
+func NewThumbnail(asset string) *Thumbnail {
+	retval := &Thumbnail{}
+	retval.StaticContentUrlDef = &StaticContentUrlDef{Url: asset}
+	return retval
+}
+
+type StaticContentUrlDef struct {
+	Url string `json:"qUrl,omitempty"`
 }
 
 type MetaDef struct {
@@ -185,7 +207,7 @@ type Info struct {
 }
 
 func CreateSheetParams(title, description, thumbnail, id string, rows, columns, rank int) SheetParams {
-	params := SheetParams{Columns: columns, Rows: rows, Rank: rank, Thumbnail: thumbnail}
+	params := SheetParams{Columns: columns, Rows: rows, Rank: rank, Thumbnail: NewThumbnail(thumbnail), Cells: []string{}}
 	params.MetaDef = &MetaDef{Title: title, Description: description}
 	params.Info = &Info{ID: id, Type: "sheet"}
 	return params

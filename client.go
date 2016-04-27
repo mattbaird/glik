@@ -30,6 +30,8 @@ import (
 	"time"
 )
 
+// Special thanks to Alex Karlsson @ QLIK
+
 const content_type_header = "Content-Type"
 const content_length_header = "Content-Length"
 const xrf_header = "X-Qlik-Xrfkey"
@@ -75,7 +77,6 @@ func (api *API) Publish(appId, streamId, name string) (ApplicationResult, error)
 func (api *API) Copy(appId, name string) (ApplicationResult, error) {
 	xrfKey := makeXrfKey()
 	url := fmt.Sprintf("%s://%s:%v/qrs/app/%s/copy?name=%s&xrfkey=%s", "https", api.Server, api.QrsPort, appId, url.QueryEscape(name), xrfKey)
-	fmt.Printf("url:%v\n", url)
 	var retval ApplicationResult
 	headers := make(map[string]string)
 	headers[xrf_header] = xrfKey
@@ -106,7 +107,7 @@ func (api *API) Reload(appId string) error {
 	headers[xrf_header] = xrfKey
 	headers[qlik_user_header] = api.makeQlikUserHeader()
 	headers[content_type_header] = application_json_content_type
-	err := api.makeRequest(url, GET, nil, nil, headers, connectTimeOut, readWriteTimeout)
+	err := api.makeRequest(url, POST, nil, nil, headers, connectTimeOut, readWriteTimeout)
 	return err
 }
 
@@ -114,7 +115,6 @@ func (api *API) getTicket() error {
 	//	https://localhost:4243/qps/ticket
 	xrfKey := makeXrfKey()
 	url := fmt.Sprintf("%s://%s:%v/qps/ticket?xrfkey=%s", "https", api.Server, api.AuthPort, xrfKey)
-	fmt.Printf("url:%v\n", url)
 	headers := make(map[string]string)
 	headers[xrf_header] = xrfKey
 	headers[qlik_user_header] = api.makeQlikUserHeader()
@@ -156,7 +156,6 @@ func (api *API) GetScript(handle int) (Response, error) {
 func (api *API) CreateSheet(handle int, title, description, thumbnail, id string, rows, columns, rank int) (Response, error) {
 	params := CreateSheetParams(title, description, thumbnail, id, rows, columns, rank)
 	command := CreateSheet(handle, params)
-	fmt.Printf("createsheet:%v\n", command.Json())
 	return api.executeWebsocketCommand(command)
 }
 
@@ -167,6 +166,16 @@ func (api *API) ListStreams() (Response, error) {
 
 func (api *API) DoReload(handle int) (Response, error) {
 	command := DoReload(handle)
+	return api.executeWebsocketCommand(command)
+}
+
+func (api *API) DoSave(handle int) (Response, error) {
+	command := DoSave(handle)
+	return api.executeWebsocketCommand(command)
+}
+
+func (api *API) GetProgress(handle int, id int) (Response, error) {
+	command := GetProgress(handle, id)
 	return api.executeWebsocketCommand(command)
 }
 
@@ -204,18 +213,24 @@ func (api *API) CloseWebSocket() error {
 	return api.WebsocketConnection.Close()
 }
 
+const debug = false
+
 func (api *API) executeWebsocketCommand(command interface{}) (Response, error) {
 	response := Response{}
+	if debug {
+		commandJson, _ := json.Marshal(command)
+		fmt.Printf("Websocket request:%v\n", string(commandJson))
+	}
 	err := api.WebsocketConnection.WriteJSON(command)
 	if err != nil {
 		return response, err
 	}
-	if false {
+	if debug {
 		_, res, err := api.WebsocketConnection.ReadMessage()
 		if err != nil {
 			return response, err
 		}
-		fmt.Printf("res:%v\n", string(res))
+		fmt.Printf("Websocket response:%v\n", string(res))
 		err = json.Unmarshal(res, &response)
 		if err != nil {
 			return response, err
@@ -248,7 +263,7 @@ func makeXrfKey() string {
 
 func (api *API) makeRequest(requestUrl string, method string, payload []byte, result interface{}, headers map[string]string,
 	cTimeout time.Duration, rwTimeout time.Duration) error {
-	if true {
+	if debug {
 		fmt.Printf("%s:%v\n", method, requestUrl)
 		if payload != nil {
 			fmt.Printf("%v\n", string(payload))
@@ -285,7 +300,7 @@ func (api *API) makeRequest(requestUrl string, method string, payload []byte, re
 	if readBodyError != nil {
 		return readBodyError
 	}
-	if false {
+	if debug {
 		fmt.Printf("body:%s\n", body)
 	}
 	if resp.StatusCode == 404 {
